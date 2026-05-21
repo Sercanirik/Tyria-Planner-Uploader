@@ -23,6 +23,9 @@ public sealed class Settings
     [JsonPropertyName("uploadOnlyIfGw2Running")]
     public bool UploadOnlyIfGw2Running { get; set; } = false;
 
+    [JsonPropertyName("uploadWipes")]
+    public bool UploadWipes { get; set; } = false;
+
     [JsonPropertyName("startWithWindows")]
     public bool StartWithWindows { get; set; } = true;
 

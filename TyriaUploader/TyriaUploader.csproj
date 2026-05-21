@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationIcon></ApplicationIcon>
-    <Version>0.1.4</Version>
+    <Version>0.1.5</Version>
     <Authors>Tyria Planner</Authors>
     <Product>Tyria Uploader</Product>
     <Description>Watches arcdps logs and uploads them to your Tyria Planner account.</Description>

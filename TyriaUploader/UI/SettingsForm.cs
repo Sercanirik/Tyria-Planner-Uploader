@@ -23,6 +23,7 @@ public sealed class SettingsForm : Form
     private readonly Theme.FieldHost _gw2EiField;
     private readonly CheckBox _autostartCheck;
     private readonly CheckBox _onlyIfGw2Check;
+    private readonly CheckBox _uploadWipesCheck;
     private FlowLayoutPanel _recentList = null!;
 
     public SettingsForm(Settings settings, FileLogger log, ApiClient api, OAuthClient _, TrayApplicationContext ctx)
@@ -80,6 +81,11 @@ public sealed class SettingsForm : Form
 
         _autostartCheck = Theme.Toggle("Start with Windows", Autostart.IsEnabled());
         _onlyIfGw2Check = Theme.Toggle("Upload only while GW2 is running", settings.UploadOnlyIfGw2Running);
+        _uploadWipesCheck = Theme.Toggle("Upload wipe logs (server preference)", settings.UploadWipes);
+        _uploadWipesCheck.Click += async (_, _) =>
+        {
+            await OnToggleUploadWipesAsync();
+        };
 
         BuildLayout();
         RefreshStatus();
@@ -241,7 +247,7 @@ public sealed class SettingsForm : Form
         var card = new Theme.Card
         {
             Margin = new Padding(0, 0, 0, 12),
-            Height = 286,
+            Height = 314,
         };
         var heading = Theme.Heading("WATCHER");
         heading.Font = Theme.LabelFont;
@@ -295,6 +301,7 @@ public sealed class SettingsForm : Form
 
         _autostartCheck.Location = new Point(20, 230);
         _onlyIfGw2Check.Location = new Point(20, 254);
+        _uploadWipesCheck.Location = new Point(20, 282);
 
         card.Controls.Add(heading);
         card.Controls.Add(folderLabel);
@@ -307,6 +314,7 @@ public sealed class SettingsForm : Form
         card.Controls.Add(divider);
         card.Controls.Add(_autostartCheck);
         card.Controls.Add(_onlyIfGw2Check);
+        card.Controls.Add(_uploadWipesCheck);
 
         void Layout()
         {
@@ -617,6 +625,52 @@ public sealed class SettingsForm : Form
             MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
         if (dr != DialogResult.OK) return;
         _ctx.ResetUploaderState();
+    }
+
+    private async Task OnToggleUploadWipesAsync()
+    {
+        var next = _uploadWipesCheck.Checked;
+        var verb = next ? "enable" : "disable";
+        var intent = next
+            ? "From now on the uploader will push your wipe logs along with kills."
+            : "From now on wipe logs will be rejected by the server.";
+        var confirm = MessageBox.Show(this,
+            $"{char.ToUpper(verb[0]) + verb.Substring(1)} wipe uploads?\n\n{intent}",
+            "Tyria Uploader", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+        if (confirm != DialogResult.OK)
+        {
+            _uploadWipesCheck.Checked = !next;
+            return;
+        }
+
+        var deleteAsk = MessageBox.Show(this,
+            "Also delete every existing wipe from your Tyria Planner history?\n\n" +
+            "Wipes never count toward DPS aggregates anyway · this only cleans " +
+            "your history list and Recent Streak card.",
+            "Tyria Uploader", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        _uploadWipesCheck.Enabled = false;
+        try
+        {
+            if (deleteAsk == DialogResult.Yes)
+            {
+                var deleted = await _api.DeleteWipesAsync();
+                _log.Info($"Deleted {deleted ?? 0} existing wipes from server");
+            }
+            var ok = await _api.SetUploadWipesPrefAsync(next);
+            if (!ok)
+            {
+                MessageBox.Show(this, "Could not update preference on the server. Try again later.",
+                    "Tyria Uploader", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _uploadWipesCheck.Checked = !next;
+                return;
+            }
+            _settings.UploadWipes = next;
+            SettingsStore.Save(_settings);
+        }
+        finally
+        {
+            _uploadWipesCheck.Enabled = true;
+        }
     }
 
     private async Task DoSignInAsync()
