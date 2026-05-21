@@ -34,7 +34,7 @@ public sealed class SettingsForm : Form
         _ctx = ctx;
 
         Text = "Tyria Uploader";
-        ClientSize = new Size(700, 790);
+        ClientSize = new Size(700, 820);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
