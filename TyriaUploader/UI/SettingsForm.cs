@@ -23,10 +23,9 @@ public sealed class SettingsForm : Form
     private readonly Theme.FieldHost _gw2EiField;
     private readonly CheckBox _autostartCheck;
     private readonly CheckBox _onlyIfGw2Check;
-    private readonly CheckBox _uploadWipesCheck;
     private FlowLayoutPanel _recentList = null!;
 
-    public SettingsForm(Settings settings, FileLogger log, ApiClient api, OAuthClient unusedOauth, TrayApplicationContext ctx)
+    public SettingsForm(Settings settings, FileLogger log, ApiClient api, OAuthClient _, TrayApplicationContext ctx)
     {
         _settings = settings;
         _log = log;
@@ -34,7 +33,7 @@ public sealed class SettingsForm : Form
         _ctx = ctx;
 
         Text = "Tyria Uploader";
-        ClientSize = new Size(700, 820);
+        ClientSize = new Size(700, 790);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -81,26 +80,10 @@ public sealed class SettingsForm : Form
 
         _autostartCheck = Theme.Toggle("Start with Windows", Autostart.IsEnabled());
         _onlyIfGw2Check = Theme.Toggle("Upload only while GW2 is running", settings.UploadOnlyIfGw2Running);
-        // UI presents this inverted from how the server / settings.json stores
-        // it · users think in terms of "keep wipes out of my history", so the
-        // checkbox reads "Exclude wipe logs" and defaults ON (wipes excluded).
-        // Internally we still write Settings.UploadWipes = !Checked so the
-        // existing API contract (PUT /api/users/me { uploadWipes }) is unchanged.
-        _uploadWipesCheck = Theme.Toggle("Exclude wipe logs from upload", !settings.UploadWipes);
-        _uploadWipesCheck.Click += async (_, _) =>
-        {
-            await OnToggleUploadWipesAsync();
-        };
 
         BuildLayout();
         RefreshStatus();
         RefreshRecent();
-        // Pull the canonical upload-wipes preference from the server in the
-        // background. Local settings.json may be stale (the toggle is also
-        // exposed in the web Profile page), so we reconcile on open. Failures
-        // leave the checkbox at whatever local thinks · the user can still
-        // toggle and re-sync.
-        _ = SyncUploadWipesPrefFromServerAsync();
 
         _ctx.ActivityChanged   += OnActivityChanged;
         _ctx.PauseStateChanged += OnPauseStateChanged;
@@ -258,7 +241,7 @@ public sealed class SettingsForm : Form
         var card = new Theme.Card
         {
             Margin = new Padding(0, 0, 0, 12),
-            Height = 314,
+            Height = 286,
         };
         var heading = Theme.Heading("WATCHER");
         heading.Font = Theme.LabelFont;
@@ -312,7 +295,6 @@ public sealed class SettingsForm : Form
 
         _autostartCheck.Location = new Point(20, 230);
         _onlyIfGw2Check.Location = new Point(20, 254);
-        _uploadWipesCheck.Location = new Point(20, 282);
 
         card.Controls.Add(heading);
         card.Controls.Add(folderLabel);
@@ -325,7 +307,6 @@ public sealed class SettingsForm : Form
         card.Controls.Add(divider);
         card.Controls.Add(_autostartCheck);
         card.Controls.Add(_onlyIfGw2Check);
-        card.Controls.Add(_uploadWipesCheck);
 
         void Layout()
         {
@@ -638,68 +619,6 @@ public sealed class SettingsForm : Form
         _ctx.ResetUploaderState();
     }
 
-    private async Task SyncUploadWipesPrefFromServerAsync()
-    {
-        var serverValue = await _api.GetUploadWipesPrefAsync();
-        if (serverValue is not bool v) return;
-        if (v == _settings.UploadWipes && _uploadWipesCheck.Checked == !v) return;
-        if (!IsHandleCreated || IsDisposed) return;
-        BeginInvoke((Action)(() =>
-        {
-            _settings.UploadWipes = v;
-            SettingsStore.Save(_settings);
-            _uploadWipesCheck.Checked = !v;
-        }));
-    }
-
-    private async Task OnToggleUploadWipesAsync()
-    {
-        // Checkbox is the "exclude" view · checked = wipes excluded =
-        // server-side uploadWipes false.
-        var nextExclude = _uploadWipesCheck.Checked;
-        var nextUpload = !nextExclude;
-        var verb = nextExclude ? "exclude" : "include";
-        var intent = nextExclude
-            ? "Wipe logs will be rejected by the server from now on."
-            : "Wipe logs will be uploaded alongside kills from now on.";
-        var confirm = MessageBox.Show(this,
-            $"{char.ToUpper(verb[0]) + verb.Substring(1)} wipes from your history?\n\n{intent}",
-            "Tyria Uploader", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
-        if (confirm != DialogResult.OK)
-        {
-            _uploadWipesCheck.Checked = !nextExclude;
-            return;
-        }
-
-        var deleteAsk = MessageBox.Show(this,
-            "Also delete every existing wipe from your Tyria Planner history?\n\n" +
-            "Wipes never count toward DPS aggregates anyway · this only cleans " +
-            "your history list and Recent Streak card.",
-            "Tyria Uploader", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-        _uploadWipesCheck.Enabled = false;
-        try
-        {
-            if (deleteAsk == DialogResult.Yes)
-            {
-                var deleted = await _api.DeleteWipesAsync();
-                _log.Info($"Deleted {deleted ?? 0} existing wipes from server");
-            }
-            var ok = await _api.SetUploadWipesPrefAsync(nextUpload);
-            if (!ok)
-            {
-                MessageBox.Show(this, "Could not update preference on the server. Try again later.",
-                    "Tyria Uploader", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                _uploadWipesCheck.Checked = !nextExclude;
-                return;
-            }
-            _settings.UploadWipes = nextUpload;
-            SettingsStore.Save(_settings);
-        }
-        finally
-        {
-            _uploadWipesCheck.Enabled = true;
-        }
-    }
 
     private async Task DoSignInAsync()
     {

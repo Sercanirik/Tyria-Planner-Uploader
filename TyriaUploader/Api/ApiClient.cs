@@ -86,52 +86,6 @@ public sealed class ApiClient
     public Task<IReadOnlyList<string>?> GetIgnoredHashesAsync(CancellationToken ct = default) =>
         FetchHashesAsync("/api/logs/ignored-hashes", ct);
 
-    public async Task<bool?> GetUploadWipesPrefAsync(CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(_accessToken)) return null;
-        try
-        {
-            using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/users/me/upload-wipes-pref");
-            AttachAuth(req);
-            using var resp = await _http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode) return null;
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
-            return doc.RootElement.TryGetProperty("uploadWipes", out var v) && v.GetBoolean();
-        }
-        catch { return null; }
-    }
-
-    public async Task<bool> SetUploadWipesPrefAsync(bool value, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(_accessToken)) return false;
-        try
-        {
-            var body = JsonSerializer.Serialize(new { uploadWipes = value });
-            using var req = new HttpRequestMessage(HttpMethod.Put, $"{_baseUrl}/api/users/me/upload-wipes-pref")
-            {
-                Content = new StringContent(body, Encoding.UTF8, "application/json"),
-            };
-            AttachAuth(req);
-            using var resp = await _http.SendAsync(req, ct);
-            return resp.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
-
-    public async Task<int?> DeleteWipesAsync(CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(_accessToken)) return null;
-        try
-        {
-            using var req = new HttpRequestMessage(HttpMethod.Delete, $"{_baseUrl}/api/logs/wipes");
-            AttachAuth(req);
-            using var resp = await _http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode) return null;
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
-            return doc.RootElement.TryGetProperty("deleted", out var v) ? v.GetInt32() : 0;
-        }
-        catch { return null; }
-    }
 
     private async Task<IReadOnlyList<string>?> FetchHashesAsync(string path, CancellationToken ct)
     {
