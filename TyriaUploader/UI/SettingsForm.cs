@@ -26,7 +26,7 @@ public sealed class SettingsForm : Form
     private readonly CheckBox _uploadWipesCheck;
     private FlowLayoutPanel _recentList = null!;
 
-    public SettingsForm(Settings settings, FileLogger log, ApiClient api, OAuthClient _, TrayApplicationContext ctx)
+    public SettingsForm(Settings settings, FileLogger log, ApiClient api, OAuthClient unusedOauth, TrayApplicationContext ctx)
     {
         _settings = settings;
         _log = log;
@@ -95,6 +95,12 @@ public sealed class SettingsForm : Form
         BuildLayout();
         RefreshStatus();
         RefreshRecent();
+        // Pull the canonical upload-wipes preference from the server in the
+        // background. Local settings.json may be stale (the toggle is also
+        // exposed in the web Profile page), so we reconcile on open. Failures
+        // leave the checkbox at whatever local thinks · the user can still
+        // toggle and re-sync.
+        _ = SyncUploadWipesPrefFromServerAsync();
 
         _ctx.ActivityChanged   += OnActivityChanged;
         _ctx.PauseStateChanged += OnPauseStateChanged;
@@ -630,6 +636,20 @@ public sealed class SettingsForm : Form
             MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
         if (dr != DialogResult.OK) return;
         _ctx.ResetUploaderState();
+    }
+
+    private async Task SyncUploadWipesPrefFromServerAsync()
+    {
+        var serverValue = await _api.GetUploadWipesPrefAsync();
+        if (serverValue is not bool v) return;
+        if (v == _settings.UploadWipes && _uploadWipesCheck.Checked == !v) return;
+        if (!IsHandleCreated || IsDisposed) return;
+        BeginInvoke((Action)(() =>
+        {
+            _settings.UploadWipes = v;
+            SettingsStore.Save(_settings);
+            _uploadWipesCheck.Checked = !v;
+        }));
     }
 
     private async Task OnToggleUploadWipesAsync()

@@ -91,7 +91,7 @@ public sealed class ApiClient
         if (string.IsNullOrEmpty(_accessToken)) return null;
         try
         {
-            using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/auth/me");
+            using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/users/me/upload-wipes-pref");
             AttachAuth(req);
             using var resp = await _http.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode) return null;
@@ -107,7 +107,7 @@ public sealed class ApiClient
         try
         {
             var body = JsonSerializer.Serialize(new { uploadWipes = value });
-            using var req = new HttpRequestMessage(HttpMethod.Put, $"{_baseUrl}/api/users/me")
+            using var req = new HttpRequestMessage(HttpMethod.Put, $"{_baseUrl}/api/users/me/upload-wipes-pref")
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json"),
             };
