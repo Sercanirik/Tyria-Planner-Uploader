@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <RootNamespace>TyriaUploader</RootNamespace>
+    <AssemblyName>TyriaUploader</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationIcon></ApplicationIcon>
+    <Version>0.1.4</Version>
+    <Authors>Tyria Planner</Authors>
+    <Product>Tyria Uploader</Product>
+    <Description>Watches arcdps logs and uploads them to your Tyria Planner account.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\icon.png" />
+  </ItemGroup>
+
+  <!--
+    Bundled GW2EI 3.22 CLI. We ship it next to the .exe so the user doesn't
+    have to install GW2EI separately (same UX as Wingman). The files live
+    under Bundled\GW2EI\ in the source tree to keep them out of the Gw2Ei\
+    code folder, but Link puts them at GW2EI\ in the publish output so
+    AppContext.BaseDirectory + "GW2EI\GuildWars2EliteInsights-CLI.exe"
+    resolves correctly at runtime.
+
+    Content items are NOT bundled into the single-file exe — they sit next
+    to it on disk, which is what we want (avoids re-extracting 23 MB on
+    every launch and keeps the GW2EI subprocess able to find its own DLLs).
+  -->
+  <ItemGroup>
+    <Content Include="Bundled\GW2EI\**\*.*">
+      <Link>GW2EI\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+</Project>
