@@ -81,7 +81,12 @@ public sealed class SettingsForm : Form
 
         _autostartCheck = Theme.Toggle("Start with Windows", Autostart.IsEnabled());
         _onlyIfGw2Check = Theme.Toggle("Upload only while GW2 is running", settings.UploadOnlyIfGw2Running);
-        _uploadWipesCheck = Theme.Toggle("Upload wipe logs (server preference)", settings.UploadWipes);
+        // UI presents this inverted from how the server / settings.json stores
+        // it · users think in terms of "keep wipes out of my history", so the
+        // checkbox reads "Exclude wipe logs" and defaults ON (wipes excluded).
+        // Internally we still write Settings.UploadWipes = !Checked so the
+        // existing API contract (PUT /api/users/me { uploadWipes }) is unchanged.
+        _uploadWipesCheck = Theme.Toggle("Exclude wipe logs from upload", !settings.UploadWipes);
         _uploadWipesCheck.Click += async (_, _) =>
         {
             await OnToggleUploadWipesAsync();
@@ -629,17 +634,20 @@ public sealed class SettingsForm : Form
 
     private async Task OnToggleUploadWipesAsync()
     {
-        var next = _uploadWipesCheck.Checked;
-        var verb = next ? "enable" : "disable";
-        var intent = next
-            ? "From now on the uploader will push your wipe logs along with kills."
-            : "From now on wipe logs will be rejected by the server.";
+        // Checkbox is the "exclude" view · checked = wipes excluded =
+        // server-side uploadWipes false.
+        var nextExclude = _uploadWipesCheck.Checked;
+        var nextUpload = !nextExclude;
+        var verb = nextExclude ? "exclude" : "include";
+        var intent = nextExclude
+            ? "Wipe logs will be rejected by the server from now on."
+            : "Wipe logs will be uploaded alongside kills from now on.";
         var confirm = MessageBox.Show(this,
-            $"{char.ToUpper(verb[0]) + verb.Substring(1)} wipe uploads?\n\n{intent}",
+            $"{char.ToUpper(verb[0]) + verb.Substring(1)} wipes from your history?\n\n{intent}",
             "Tyria Uploader", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
         if (confirm != DialogResult.OK)
         {
-            _uploadWipesCheck.Checked = !next;
+            _uploadWipesCheck.Checked = !nextExclude;
             return;
         }
 
@@ -656,15 +664,15 @@ public sealed class SettingsForm : Form
                 var deleted = await _api.DeleteWipesAsync();
                 _log.Info($"Deleted {deleted ?? 0} existing wipes from server");
             }
-            var ok = await _api.SetUploadWipesPrefAsync(next);
+            var ok = await _api.SetUploadWipesPrefAsync(nextUpload);
             if (!ok)
             {
                 MessageBox.Show(this, "Could not update preference on the server. Try again later.",
                     "Tyria Uploader", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                _uploadWipesCheck.Checked = !next;
+                _uploadWipesCheck.Checked = !nextExclude;
                 return;
             }
-            _settings.UploadWipes = next;
+            _settings.UploadWipes = nextUpload;
             SettingsStore.Save(_settings);
         }
         finally
