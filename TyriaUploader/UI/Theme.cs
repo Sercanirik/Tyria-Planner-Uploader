@@ -145,30 +145,44 @@ internal static class Theme
 
     public static Bitmap LoadLogo()
     {
-        var asm = Assembly.GetExecutingAssembly();
-
-        using var stream = asm.GetManifestResourceStream("TyriaUploader.Resources.icon.png")
-            ?? throw new InvalidOperationException("Embedded logo not found");
-        return new Bitmap(stream);
+        // Full crest logo used inside the settings window header. icon.png
+        // includes the shield surround for a "premium" look in-app.
+        return LoadEmbeddedPng("TyriaUploader.Resources.icon.png");
     }
 
     public static Icon LoadAppIcon()
     {
-        using var bmp = LoadLogo();
-
-        using var square = new Bitmap(256, 256);
-        using (var g = Graphics.FromImage(square))
+        // Tray / taskbar / title-bar icon · the crest's shield reads as
+        // mush at 16-24px so we ship a lion-only variant (tray.png) for
+        // these small surfaces. Falls back to the full crest if the
+        // shield-less asset is somehow missing.
+        Bitmap bmp;
+        try { bmp = LoadEmbeddedPng("TyriaUploader.Resources.tray.png"); }
+        catch { bmp = LoadLogo(); }
+        using (bmp)
+        using (var square = new Bitmap(256, 256))
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            int side = Math.Min(bmp.Width, bmp.Height);
-            int sx = (bmp.Width - side) / 2;
-            int sy = (bmp.Height - side) / 2;
-            g.DrawImage(bmp, new Rectangle(0, 0, 256, 256), new Rectangle(sx, sy, side, side), GraphicsUnit.Pixel);
+            using (var g = Graphics.FromImage(square))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                int side = Math.Min(bmp.Width, bmp.Height);
+                int sx = (bmp.Width - side) / 2;
+                int sy = (bmp.Height - side) / 2;
+                g.DrawImage(bmp, new Rectangle(0, 0, 256, 256), new Rectangle(sx, sy, side, side), GraphicsUnit.Pixel);
+            }
+            var hicon = square.GetHicon();
+            return Icon.FromHandle(hicon);
         }
-        var hicon = square.GetHicon();
-        return Icon.FromHandle(hicon);
+    }
+
+    private static Bitmap LoadEmbeddedPng(string resourceName)
+    {
+        var asm = Assembly.GetExecutingAssembly();
+        using var stream = asm.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded resource not found: {resourceName}");
+        return new Bitmap(stream);
     }
 
     public static LinkLabel Link(string text)
