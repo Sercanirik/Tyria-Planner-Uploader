@@ -28,6 +28,10 @@ internal static class Program
         TokenStore.SetLogger(logger);
         logger.Info($"Tyria Uploader {Application.ProductVersion} starting");
 
+        // GW2EI is framework-dependent on .NET 8 — prompt + install the runtime
+        // before the tray starts watching so we don't spam parse-fail warnings.
+        RuntimeBootstrap.EnsureRuntimeReady(settings, logger);
+
         try
         {
             using var ctx = new TrayApplicationContext(settings, logger);

@@ -63,8 +63,12 @@ public static class SettingsStore
 
     private static void ApplyBundledGw2EiDefault(Settings s)
     {
-        if (string.IsNullOrWhiteSpace(s.Gw2EiCliPath) && BundledGw2EiCliPath != null)
-            s.Gw2EiCliPath = BundledGw2EiCliPath;
+        var bundled = BundledGw2EiCliPath;
+        if (bundled == null) return;
+        // No configured path, or the configured path no longer exists (uploader
+        // folder moved/renamed) — fall back to the GW2EI shipped next to the exe.
+        if (string.IsNullOrWhiteSpace(s.Gw2EiCliPath) || !File.Exists(s.Gw2EiCliPath))
+            s.Gw2EiCliPath = bundled;
     }
 
     public static void Save(Settings s)

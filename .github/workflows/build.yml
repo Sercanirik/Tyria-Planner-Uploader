@@ -31,6 +31,9 @@ jobs:
         run: dotnet build TyriaUploader.sln -c Release --no-restore
 
       - name: Publish (single-file, self-contained, win-x64)
+        # publish/ contains TyriaUploader.exe alongside the bundled GW2EI/ folder
+        # (csproj <Content> rules copy it next to the exe, ExcludeFromSingleFile
+        # keeps it as loose files instead of extracting on every launch).
         run: >
           dotnet publish TyriaUploader/TyriaUploader.csproj
           -c Release
@@ -40,18 +43,30 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
           -o publish
 
+      - name: Package release zip
+        shell: pwsh
+        run: |
+          $name = "TyriaUploader-${{ github.sha }}"
+          Compress-Archive -Path publish/* -DestinationPath "$name.zip" -Force
+          if (Test-Path "publish/TyriaUploader.exe") {
+            Write-Host "Zip contains:"
+            (Get-ChildItem publish -Recurse | Select-Object -ExpandProperty FullName) | ForEach-Object {
+              $_.Replace("$PWD\publish\", "  ")
+            }
+          }
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: TyriaUploader-${{ github.sha }}
-          path: publish/TyriaUploader.exe
+          path: TyriaUploader-${{ github.sha }}.zip
           retention-days: 30
 
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: publish/TyriaUploader.exe
+          files: TyriaUploader-${{ github.sha }}.zip
           draft: false
           prerelease: false
           generate_release_notes: true
